@@ -1,0 +1,24 @@
+# Implementation Tasks - Delegate AI Agent Authorization Service
+
+- [x] Milestone 1: Data Models + Canonicalization + Cryptography Helpers
+  - [x] Create `requirements.txt`
+  - [x] Implement `app/crypto.py` (`canonicalize`, Ed25519 keypair, sign & verify helpers)
+  - [x] Implement `app/models.py` (SQLAlchemy models: Principal, Agent, Credential, ActionRequest, AuditRecord)
+  - [x] Implement `app/schemas.py` (Pydantic models)
+- [x] Milestone 2: Credential Issuance, Scope Sub-delegation & Revocation Cascade
+  - [x] Implement `app/services.py` sub-delegation scope validation
+  - [x] Implement `app/services.py` revocation cascading logic
+  - [x] Create API routes for `/principals`, `/agents`, `/credentials`, `/credentials/{id}/revoke`, `/credentials/{id}`
+- [x] Milestone 3: Action Verification Engine & Audit Ledger Chaining
+  - [x] Implement 10-step Action Verification Engine in `app/services.py`
+  - [x] Implement hash-chained Audit Ledger generation & verification (`GET /audit`)
+  - [x] Create API routes in `app/main.py`
+  - [x] Assemble FastAPI application in `app/main.py`
+- [x] Milestone 4: Pytest Suite
+  - [x] Create `tests/test_delegate.py` with all 8 specified scenario tests
+  - [x] Run pytest and verify 100% test pass rate
+- [x] Milestone 5: Standalone Verifier, CLI Demo & Enterprise Web UI
+  - [x] Implement `verify.py` standalone offline presentation verifier
+  - [x] Implement `demo.py` CLI script executing steps 1–10
+  - [x] Implement `static/index.html` anti-vibe-coded clean enterprise UI
+  - [x] Execute `demo.py` end-to-end to verify full system functionality
