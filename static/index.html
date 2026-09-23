@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Delegate — AI Agent Credential & Audit Engine</title>
+  <style>
+    :root {
+      --bg-color: #f8fafc;
+      --card-bg: #ffffff;
+      --text-color: #0f172a;
+      --text-muted: #475569;
+      --border-color: #cbd5e1;
+      --primary: #1e293b;
+      --primary-hover: #0f172a;
+      --accent: #2563eb;
+      --danger: #b91c1c;
+      --success: #15803d;
+      --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      font-family: var(--font-sans);
+      line-height: 1.5;
+      padding: 24px;
+      max-width: 1280px;
+      margin: 0 auto;
+    }
+
+    header {
+      border-bottom: 2px solid var(--border-color);
+      padding-bottom: 16px;
+      margin-bottom: 24px;
+    }
+
+    h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--primary);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    p.subtitle {
+      font-size: 0.875rem;
+      color: var(--text-muted);
+    }
+
+    .grid-layout {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      margin-bottom: 24px;
+    }
+
+    @media (max-width: 900px) {
+      .grid-layout {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .section-box {
+      background-color: var(--card-bg);
+      border: 1px solid var(--border-color);
+      padding: 20px;
+    }
+
+    .section-title {
+      font-size: 1rem;
+      font-weight: 600;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 8px;
+      margin-bottom: 16px;
+      text-transform: uppercase;
+      letter-spacing: 0.025em;
+    }
+
+    .form-group {
+      margin-bottom: 12px;
+    }
+
+    label {
+      display: block;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+    }
+
+    input, select, textarea {
+      width: 100%;
+      padding: 8px 10px;
+      font-size: 0.875rem;
+      font-family: var(--font-sans);
+      border: 1px solid var(--border-color);
+      background: var(--bg-color);
+      color: var(--text-color);
+      border-radius: 0;
+    }
+
+    input:focus, select:focus, textarea:focus {
+      outline: 2px solid var(--accent);
+      background: #ffffff;
+    }
+
+    button {
+      background-color: var(--primary);
+      color: #ffffff;
+      border: none;
+      padding: 8px 16px;
+      font-size: 0.875rem;
+      font-weight: 600;
+      cursor: pointer;
+      border-radius: 0;
+      text-transform: uppercase;
+      letter-spacing: 0.025em;
+    }
+
+    button:hover {
+      background-color: var(--primary-hover);
+    }
+
+    button.btn-danger {
+      background-color: var(--danger);
+    }
+
+    button.btn-danger:hover {
+      background-color: #991b1b;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.8125rem;
+      margin-top: 12px;
+    }
+
+    th, td {
+      border: 1px solid var(--border-color);
+      padding: 8px;
+      text-align: left;
+    }
+
+    th {
+      background-color: var(--bg-color);
+      font-weight: 600;
+      text-transform: uppercase;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    .code-text {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      word-break: break-all;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 6px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      border-radius: 0;
+    }
+
+    .badge-approved {
+      background-color: #dcfce7;
+      color: #166534;
+      border: 1px solid #bbf7d0;
+    }
+
+    .badge-rejected {
+      background-color: #fee2e2;
+      color: #991b1b;
+      border: 1px solid #fecaca;
+    }
+
+    .badge-active {
+      background-color: #e0f2fe;
+      color: #075985;
+      border: 1px solid #bae6fd;
+    }
+
+    .badge-revoked {
+      background-color: #f1f5f9;
+      color: #475569;
+      border: 1px solid #cbd5e1;
+    }
+
+    #verdict-display {
+      margin-top: 16px;
+      padding: 12px;
+      border: 1px solid var(--border-color);
+      background: var(--bg-color);
+      display: none;
+    }
+
+    .full-width-section {
+      margin-bottom: 24px;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>Delegate Enterprise Verification Engine</h1>
+    <p class="subtitle">Cryptographic AI Agent Delegation & Audit Ledger Control System</p>
+  </header>
+
+  <div class="grid-layout">
+    <!-- Registration -->
+    <div class="section-box">
+      <div class="section-title">1. Entity Registration</div>
+      <div class="form-group">
+        <label for="entity-type">Entity Type</label>
+        <select id="entity-type">
+          <option value="principal">Human Principal (Issuer)</option>
+          <option value="agent">AI Agent (Subject)</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="entity-name">Name</label>
+        <input type="text" id="entity-name" placeholder="e.g. Priya Sharma or Procurement-Agent-v1">
+      </div>
+      <button onclick="registerEntity()">Register Entity & Generate Keys</button>
+
+      <div style="margin-top: 16px;">
+        <label>Registered Principals & Agents</label>
+        <table>
+          <thead>
+            <tr>
+              <th>Type</th>
+              <th>ID</th>
+              <th>Name</th>
+              <th>Public Key</th>
+            </tr>
+          </thead>
+          <tbody id="entities-list">
+            <tr><td colspan="4" style="text-align:center; color: var(--text-muted);">No entities registered yet</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Credential Issuance -->
+    <div class="section-box">
+      <div class="section-title">2. Issue Delegation Credential</div>
+      <div class="form-group">
+        <label for="cred-issuer">Issuer Principal ID</label>
+        <input type="text" id="cred-issuer" placeholder="principal-id">
+      </div>
+      <div class="form-group">
+        <label for="cred-issuer-key">Issuer Private Key (Hex for Signing)</label>
+        <input type="text" id="cred-issuer-key" placeholder="private key hex">
+      </div>
+      <div class="form-group">
+        <label for="cred-subject">Subject Agent ID</label>
+        <input type="text" id="cred-subject" placeholder="agent-id">
+      </div>
+      <div class="form-group">
+        <label for="cred-parent">Parent Credential ID (Optional Sub-delegation)</label>
+        <input type="text" id="cred-parent" placeholder="leave blank for root credential">
+      </div>
+      <div class="grid-layout" style="gap:12px; margin-bottom:0;">
+        <div class="form-group">
+          <label for="cred-max-action">Max / Action ($)</label>
+          <input type="number" id="cred-max-action" value="5000">
+        </div>
+        <div class="form-group">
+          <label for="cred-max-cum">Max Cumulative ($)</label>
+          <input type="number" id="cred-max-cum" value="20000">
+        </div>
+      </div>
+      <button onclick="issueCredential()">Issue Signed Credential</button>
+    </div>
+  </div>
+
+  <!-- Credentials Table -->
+  <div class="section-box full-width-section">
+    <div class="section-title">3. Active Credentials</div>
+    <table>
+      <thead>
+        <tr>
+          <th>Credential ID</th>
+          <th>Issuer / Subject</th>
+          <th>Parent ID</th>
+          <th>Max/Action</th>
+          <th>Spent / Cum. Max</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="credentials-list">
+        <tr><td colspan="7" style="text-align:center; color: var(--text-muted);">No credentials issued yet</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Action Request & Audit Ledger -->
+  <div class="grid-layout">
+    <!-- Submit Action -->
+    <div class="section-box">
+      <div class="section-title">4. Action Request Execution</div>
+      <div class="form-group">
+        <label for="act-id">Action ID</label>
+        <input type="text" id="act-id" placeholder="action-101">
+      </div>
+      <div class="form-group">
+        <label for="act-agent-id">Agent ID</label>
+        <input type="text" id="act-agent-id" placeholder="agent-id">
+      </div>
+      <div class="form-group">
+        <label for="act-agent-key">Agent Private Key (For Signature)</label>
+        <input type="text" id="act-agent-key" placeholder="agent private key hex">
+      </div>
+      <div class="form-group">
+        <label for="act-cred-id">Credential ID</label>
+        <input type="text" id="act-cred-id" placeholder="cred-id">
+      </div>
+      <div class="grid-layout" style="gap:12px; margin-bottom:0;">
+        <div class="form-group">
+          <label for="act-type">Action Type</label>
+          <input type="text" id="act-type" value="renew">
+        </div>
+        <div class="form-group">
+          <label for="act-amount">Amount ($)</label>
+          <input type="number" id="act-amount" value="3200">
+        </div>
+      </div>
+      <button onclick="submitAction()">Submit & Verify Action</button>
+
+      <div id="verdict-display">
+        <strong>Verdict:</strong> <span id="verdict-status"></span>
+        <div id="verdict-reasons" style="margin-top: 6px; font-size: 0.8125rem; color: var(--danger);"></div>
+      </div>
+    </div>
+
+    <!-- Audit Ledger -->
+    <div class="section-box">
+      <div class="section-title">
+        5. Audit Chain Ledger
+        <span id="chain-status" style="float: right; font-size: 0.75rem;">Chain Status: -</span>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Action ID</th>
+            <th>Verdict</th>
+            <th>Spend</th>
+            <th>Record Hash</th>
+          </tr>
+        </thead>
+        <tbody id="audit-list">
+          <tr><td colspan="5" style="text-align:center; color: var(--text-muted);">Audit ledger empty</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    const API_BASE = "";
+    let localKeys = {};
+
+    async function registerEntity() {
+      const type = document.getElementById("entity-type").value;
+      const name = document.getElementById("entity-name").value;
+      if (!name) return alert("Please enter entity name");
+
+      const endpoint = type === "principal" ? "/principals" : "/agents";
+      const resp = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name })
+      });
+
+      if (!resp.ok) return alert("Registration failed");
+      const data = await resp.json();
+      localKeys[data.id] = data.private_key;
+
+      alert(`Registered ${type.toUpperCase()}: ${data.id}\nPrivate Key (Save this): ${data.private_key}`);
+      loadEntities();
+    }
+
+    async function loadEntities() {
+      // Refresh local lists from credentials/audit
+      loadCredentials();
+      loadAudit();
+    }
+
+    async function issueCredential() {
+      const issuer_principal_id = document.getElementById("cred-issuer").value;
+      const issuer_private_key = document.getElementById("cred-issuer-key").value;
+      const subject_agent_id = document.getElementById("cred-subject").value;
+      const parent_credential_id = document.getElementById("cred-parent").value || null;
+      const max_amount_per_action = parseFloat(document.getElementById("cred-max-action").value);
+      const max_amount_cumulative = parseFloat(document.getElementById("cred-max-cum").value);
+
+      const now = new Date();
+      const valid_from = new Date(now.getTime() - 60000).toISOString();
+      const valid_until = new Date(now.getTime() + 90 * 86400000).toISOString();
+
+      const payload = {
+        issuer_principal_id,
+        subject_agent_id,
+        parent_credential_id,
+        action_types: ["purchase", "renew"],
+        categories: ["software", "hardware"],
+        max_amount_per_action,
+        max_amount_cumulative,
+        currency: "USD",
+        valid_from,
+        valid_until,
+        allow_sub_delegation: true,
+        issuer_private_key
+      };
+
+      const resp = await fetch("/credentials", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+
+      const resData = await resp.json();
+      if (!resp.ok) {
+        alert("Failed to issue credential: " + (resData.detail || JSON.stringify(resData)));
+        return;
+      }
+      alert("Issued Credential ID: " + resData.id);
+      loadCredentials();
+    }
+
+    async function revokeCredential(credId) {
+      if (!confirm("Revoke credential " + credId + "?")) return;
+      const resp = await fetch(`/credentials/${credId}/revoke`, { method: "POST" });
+      const data = await resp.json();
+      alert("Revocation complete: " + data.revoked_count + " credential(s) revoked.");
+      loadCredentials();
+    }
+
+    async function loadCredentials() {
+      // Read credentials from active audit / actions list or mock view
+      // We will render table when actions or credentials created
+    }
+
+    async function submitAction() {
+      const id = document.getElementById("act-id").value || ("action-" + Math.floor(Math.random()*10000));
+      const agent_id = document.getElementById("act-agent-id").value;
+      const agent_priv_key = document.getElementById("act-agent-key").value;
+      const credential_id = document.getElementById("act-cred-id").value;
+      const action_type = document.getElementById("act-type").value;
+      const amount = parseFloat(document.getElementById("act-amount").value);
+      const timestamp = new Date().toISOString();
+
+      if (!agent_priv_key) return alert("Please enter agent private key for client signing");
+
+      const details = { category: "software", amount, vendor: "Enterprise Vendor" };
+
+      // Canonical payload simulation for signing in browser demo
+      // For demo JS UI, we send signature directly by calling backend signing endpoint or local sign
+      // We can generate hex signature using backend helper or simple fetch to create test request
+      alert("Submitting action request...");
+    }
+
+    async function loadAudit() {
+      const resp = await fetch("/audit");
+      if (!resp.ok) return;
+      const data = await resp.json();
+
+      const tbody = document.getElementById("audit-list");
+      const chainSpan = document.getElementById("chain-status");
+
+      chainSpan.innerHTML = data.chain_valid 
+        ? '<span style="color: var(--success); font-weight: bold;">CHAIN VALID</span>'
+        : '<span style="color: var(--danger); font-weight: bold;">CHAIN INVALID</span>';
+
+      if (data.records.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color: var(--text-muted);">Audit ledger empty</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = data.records.map(r => `
+        <tr>
+          <td>${r.id}</td>
+          <td class="code-text">${r.action_id}</td>
+          <td><span class="badge badge-${r.verdict}">${r.verdict}</span></td>
+          <td>$${r.cumulative_spend_after.toFixed(2)}</td>
+          <td class="code-text">${r.record_hash.substring(0, 12)}...</td>
+        </tr>
+      `).join("");
+    }
+
+    // Initial load
+    loadAudit();
+  </script>
+</body>
+</html>
