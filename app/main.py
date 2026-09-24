@@ -15,8 +15,8 @@ from app.schemas import (
     AuditLedgerResponse, AuditRecordSchema
 )
 from app.services import (
-    get_credential_payload, validate_sub_delegation, revoke_credential_cascade,
-    verify_action_request, get_audit_ledger
+    IN_MEMORY_KEY_STORE, get_credential_payload, validate_sub_delegation,
+    revoke_credential_cascade, verify_action_request, get_audit_ledger
 )
 
 init_db()
@@ -45,7 +45,6 @@ def register_principal(payload: PrincipalCreate, db: Session = Depends(get_db)):
     pub_key, priv_key = generate_keypair()
     principal_id = payload.id if payload.id else f"principal-{uuid.uuid4().hex[:8]}"
 
-    # Check if ID exists
     existing = db.query(Principal).filter(Principal.id == principal_id).first()
     if existing:
         raise HTTPException(status_code=400, detail="Principal ID already exists")
@@ -54,12 +53,19 @@ def register_principal(payload: PrincipalCreate, db: Session = Depends(get_db)):
     db.add(principal)
     db.commit()
 
+    # Save private key ONLY in server in-memory store, never return to frontend
+    IN_MEMORY_KEY_STORE[principal.id] = priv_key
+
     return PrincipalResponse(
         id=principal.id,
         name=principal.name,
-        public_key=pub_key,
-        private_key=priv_key  # Returned ONLY in response, never persisted in DB
+        public_key=pub_key
     )
+
+
+@app.get("/principals", response_model=List[PrincipalResponse])
+def list_principals(db: Session = Depends(get_db)):
+    return db.query(Principal).all()
 
 
 @app.post("/agents", response_model=AgentResponse)
@@ -75,12 +81,19 @@ def register_agent(payload: AgentCreate, db: Session = Depends(get_db)):
     db.add(agent)
     db.commit()
 
+    # Save private key ONLY in server in-memory store, never return to frontend
+    IN_MEMORY_KEY_STORE[agent.id] = priv_key
+
     return AgentResponse(
         id=agent.id,
         name=agent.name,
-        public_key=pub_key,
-        private_key=priv_key  # Returned ONLY in response, never persisted in DB
+        public_key=pub_key
     )
+
+
+@app.get("/agents", response_model=List[AgentResponse])
+def list_agents(db: Session = Depends(get_db)):
+    return db.query(Agent).all()
 
 
 @app.post("/credentials", response_model=CredentialResponse)
@@ -104,6 +117,14 @@ def issue_credential(req: CredentialCreate, db: Session = Depends(get_db)):
 
     cred_id = req.id if req.id else f"cred-{uuid.uuid4().hex[:8]}"
 
+    # Determine private key for signing
+    issuer_priv = req.issuer_private_key or IN_MEMORY_KEY_STORE.get(req.issuer_principal_id)
+    if not issuer_priv:
+        raise HTTPException(
+            status_code=400,
+            detail="Issuer private key not provided and not found in server key store"
+        )
+
     # Canonicalize and sign
     sig_payload = get_credential_payload(
         cred_id, req.issuer_principal_id, req.subject_agent_id,
@@ -113,7 +134,7 @@ def issue_credential(req: CredentialCreate, db: Session = Depends(get_db)):
     )
 
     try:
-        signature = sign_payload(req.issuer_private_key, sig_payload)
+        signature = sign_payload(issuer_priv, sig_payload)
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed to sign credential: {e}")
 
@@ -139,6 +160,11 @@ def issue_credential(req: CredentialCreate, db: Session = Depends(get_db)):
     db.refresh(credential)
 
     return credential
+
+
+@app.get("/credentials", response_model=List[CredentialResponse])
+def list_credentials(db: Session = Depends(get_db)):
+    return db.query(Credential).all()
 
 
 @app.post("/credentials/{credential_id}/revoke")
