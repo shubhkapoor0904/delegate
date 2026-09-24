@@ -1,3 +1,4 @@
+# pyrefly: ignore [missing-import]
 import pytest
 from datetime import datetime, timezone, timedelta
 from fastapi.testclient import TestClient
@@ -7,6 +8,7 @@ from sqlalchemy.orm import sessionmaker
 from app.main import app, get_db
 from app.models import Base
 from app.crypto import sign_payload, get_action_request_payload
+from app.services import IN_MEMORY_KEY_STORE
 
 SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"
 
@@ -42,13 +44,18 @@ def test_1_root_credential_in_scope_approved():
     assert p_resp.status_code == 200
     p_data = p_resp.json()
     principal_id = p_data["id"]
-    principal_priv_key = p_data["private_key"]
+    principal_priv_key = IN_MEMORY_KEY_STORE[principal_id]
+
+    # Verify private_key is NOT returned in API response
+    assert "private_key" not in p_data
 
     a_resp = client.post("/agents", json={"name": "procurement-agent"})
     assert a_resp.status_code == 200
     a_data = a_resp.json()
     agent_id = a_data["id"]
-    agent_priv_key = a_data["private_key"]
+    agent_priv_key = IN_MEMORY_KEY_STORE[agent_id]
+
+    assert "private_key" not in a_data
 
     # 2. Issue root credential
     now = datetime.now(timezone.utc)
@@ -101,7 +108,6 @@ def test_1_root_credential_in_scope_approved():
 
 
 def test_2_exceed_max_amount_per_action_rejected():
-    # Setup
     p_data = client.post("/principals", json={"name": "priya"}).json()
     a_data = client.post("/agents", json={"name": "agent"}).json()
 
@@ -116,7 +122,7 @@ def test_2_exceed_max_amount_per_action_rejected():
         "valid_from": (now - timedelta(minutes=1)).isoformat(),
         "valid_until": (now + timedelta(days=90)).isoformat(),
         "allow_sub_delegation": True,
-        "issuer_private_key": p_data["private_key"]
+        "issuer_private_key": IN_MEMORY_KEY_STORE[p_data["id"]]
     }).json()
 
     # Submit action exceeding max_amount_per_action ($6,000 > $5,000)
@@ -132,7 +138,7 @@ def test_2_exceed_max_amount_per_action_rejected():
         "details": details,
         "timestamp": timestamp
     }
-    sig = sign_payload(a_data["private_key"], payload)
+    sig = sign_payload(IN_MEMORY_KEY_STORE[a_data["id"]], payload)
 
     resp = client.post("/actions", json={
         "id": action_id,
@@ -163,20 +169,20 @@ def test_3_exceed_cumulative_cap_rejected():
         "valid_from": (now - timedelta(minutes=1)).isoformat(),
         "valid_until": (now + timedelta(days=90)).isoformat(),
         "allow_sub_delegation": True,
-        "issuer_private_key": p_data["private_key"]
+        "issuer_private_key": IN_MEMORY_KEY_STORE[p_data["id"]]
     }).json()
 
     # Action 1: $4,000 (Approved)
     t1 = datetime.now(timezone.utc).isoformat()
     d1 = {"category": "software", "amount": 4000.0}
-    sig1 = sign_payload(a_data["private_key"], {"id": "act-1", "agent_id": a_data["id"], "credential_id": c_data["id"], "action_type": "purchase", "details": d1, "timestamp": t1})
+    sig1 = sign_payload(IN_MEMORY_KEY_STORE[a_data["id"]], {"id": "act-1", "agent_id": a_data["id"], "credential_id": c_data["id"], "action_type": "purchase", "details": d1, "timestamp": t1})
     r1 = client.post("/actions", json={"id": "act-1", "agent_id": a_data["id"], "credential_id": c_data["id"], "action_type": "purchase", "details": d1, "timestamp": t1, "agent_signature": sig1}).json()
     assert r1["verdict"] == "approved"
 
     # Action 2: $4,000 ($4,000 + $4,000 = $8,000 > $7,000 cap) -> Rejected
     t2 = datetime.now(timezone.utc).isoformat()
     d2 = {"category": "software", "amount": 4000.0}
-    sig2 = sign_payload(a_data["private_key"], {"id": "act-2", "agent_id": a_data["id"], "credential_id": c_data["id"], "action_type": "purchase", "details": d2, "timestamp": t2})
+    sig2 = sign_payload(IN_MEMORY_KEY_STORE[a_data["id"]], {"id": "act-2", "agent_id": a_data["id"], "credential_id": c_data["id"], "action_type": "purchase", "details": d2, "timestamp": t2})
     r2 = client.post("/actions", json={"id": "act-2", "agent_id": a_data["id"], "credential_id": c_data["id"], "action_type": "purchase", "details": d2, "timestamp": t2, "agent_signature": sig2}).json()
     assert r2["verdict"] == "rejected"
     assert "exceeds max_amount_cumulative" in r2["reasons"]
@@ -197,7 +203,7 @@ def test_4_action_with_revoked_credential_rejected():
         "valid_from": (now - timedelta(minutes=1)).isoformat(),
         "valid_until": (now + timedelta(days=90)).isoformat(),
         "allow_sub_delegation": True,
-        "issuer_private_key": p_data["private_key"]
+        "issuer_private_key": IN_MEMORY_KEY_STORE[p_data["id"]]
     }).json()
 
     # Revoke credential
@@ -206,7 +212,7 @@ def test_4_action_with_revoked_credential_rejected():
     # Try submitting action
     t = datetime.now(timezone.utc).isoformat()
     d = {"category": "software", "amount": 1000.0}
-    sig = sign_payload(a_data["private_key"], {"id": "act-rev", "agent_id": a_data["id"], "credential_id": c_data["id"], "action_type": "purchase", "details": d, "timestamp": t})
+    sig = sign_payload(IN_MEMORY_KEY_STORE[a_data["id"]], {"id": "act-rev", "agent_id": a_data["id"], "credential_id": c_data["id"], "action_type": "purchase", "details": d, "timestamp": t})
     r = client.post("/actions", json={"id": "act-rev", "agent_id": a_data["id"], "credential_id": c_data["id"], "action_type": "purchase", "details": d, "timestamp": t, "agent_signature": sig}).json()
     assert r["verdict"] == "rejected"
     assert "credential not active" in r["reasons"]
@@ -228,7 +234,7 @@ def test_5_parent_revocation_cascades_to_child():
         "valid_from": (now - timedelta(minutes=1)).isoformat(),
         "valid_until": (now + timedelta(days=90)).isoformat(),
         "allow_sub_delegation": True,
-        "issuer_private_key": p_data["private_key"]
+        "issuer_private_key": IN_MEMORY_KEY_STORE[p_data["id"]]
     }).json()
 
     # Child credential
@@ -243,7 +249,7 @@ def test_5_parent_revocation_cascades_to_child():
         "valid_from": (now - timedelta(minutes=1)).isoformat(),
         "valid_until": (now + timedelta(days=30)).isoformat(),
         "allow_sub_delegation": False,
-        "issuer_private_key": p_data["private_key"]
+        "issuer_private_key": IN_MEMORY_KEY_STORE[p_data["id"]]
     }).json()
 
     # Revoke Root
@@ -256,7 +262,7 @@ def test_5_parent_revocation_cascades_to_child():
     # Action on child should be rejected
     t = datetime.now(timezone.utc).isoformat()
     d = {"category": "software", "amount": 1000.0}
-    sig = sign_payload(a_data["private_key"], {"id": "act-child", "agent_id": a_data["id"], "credential_id": child_c["id"], "action_type": "purchase", "details": d, "timestamp": t})
+    sig = sign_payload(IN_MEMORY_KEY_STORE[a_data["id"]], {"id": "act-child", "agent_id": a_data["id"], "credential_id": child_c["id"], "action_type": "purchase", "details": d, "timestamp": t})
     r = client.post("/actions", json={"id": "act-child", "agent_id": a_data["id"], "credential_id": child_c["id"], "action_type": "purchase", "details": d, "timestamp": t, "agent_signature": sig}).json()
     assert r["verdict"] == "rejected"
 
@@ -276,13 +282,13 @@ def test_6_replay_exact_action_id_rejected():
         "valid_from": (now - timedelta(minutes=1)).isoformat(),
         "valid_until": (now + timedelta(days=90)).isoformat(),
         "allow_sub_delegation": True,
-        "issuer_private_key": p_data["private_key"]
+        "issuer_private_key": IN_MEMORY_KEY_STORE[p_data["id"]]
     }).json()
 
     # Submit action 1
     t = datetime.now(timezone.utc).isoformat()
     d = {"category": "software", "amount": 1000.0}
-    sig = sign_payload(a_data["private_key"], {"id": "action-replay-id", "agent_id": a_data["id"], "credential_id": c_data["id"], "action_type": "purchase", "details": d, "timestamp": t})
+    sig = sign_payload(IN_MEMORY_KEY_STORE[a_data["id"]], {"id": "action-replay-id", "agent_id": a_data["id"], "credential_id": c_data["id"], "action_type": "purchase", "details": d, "timestamp": t})
 
     r1 = client.post("/actions", json={"id": "action-replay-id", "agent_id": a_data["id"], "credential_id": c_data["id"], "action_type": "purchase", "details": d, "timestamp": t, "agent_signature": sig}).json()
     assert r1["verdict"] == "approved"
@@ -308,13 +314,13 @@ def test_7_tamper_amount_after_signing_invalidates_signature():
         "valid_from": (now - timedelta(minutes=1)).isoformat(),
         "valid_until": (now + timedelta(days=90)).isoformat(),
         "allow_sub_delegation": True,
-        "issuer_private_key": p_data["private_key"]
+        "issuer_private_key": IN_MEMORY_KEY_STORE[p_data["id"]]
     }).json()
 
     # Agent signs for $1,000
     t = datetime.now(timezone.utc).isoformat()
     original_details = {"category": "software", "amount": 1000.0}
-    sig = sign_payload(a_data["private_key"], {"id": "tamper-act", "agent_id": a_data["id"], "credential_id": c_data["id"], "action_type": "purchase", "details": original_details, "timestamp": t})
+    sig = sign_payload(IN_MEMORY_KEY_STORE[a_data["id"]], {"id": "tamper-act", "agent_id": a_data["id"], "credential_id": c_data["id"], "action_type": "purchase", "details": original_details, "timestamp": t})
 
     # Tamper with payload: change amount to $2,000 while keeping original signature
     tampered_details = {"category": "software", "amount": 2000.0}
@@ -348,7 +354,7 @@ def test_8_overbroad_subdelegation_rejected_at_issuance():
         "valid_from": (now - timedelta(minutes=1)).isoformat(),
         "valid_until": (now + timedelta(days=90)).isoformat(),
         "allow_sub_delegation": True,
-        "issuer_private_key": p_data["private_key"]
+        "issuer_private_key": IN_MEMORY_KEY_STORE[p_data["id"]]
     }).json()
 
     # Attempt child with broader category ["software", "hardware"] or higher amount $10,000
@@ -363,7 +369,7 @@ def test_8_overbroad_subdelegation_rejected_at_issuance():
         "valid_from": (now - timedelta(minutes=1)).isoformat(),
         "valid_until": (now + timedelta(days=90)).isoformat(),
         "allow_sub_delegation": False,
-        "issuer_private_key": p_data["private_key"]
+        "issuer_private_key": IN_MEMORY_KEY_STORE[p_data["id"]]
     })
 
     assert sub_resp.status_code == 400
