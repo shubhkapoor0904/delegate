@@ -1,0 +1,98 @@
+Update the Delegate project to NEVER display private keys in the frontend UI.
+
+Current problem:
+When registering an Agent, the frontend shows a browser alert like:
+"Registered AGENT: agent-xxxx
+Private Key (Save this): <full private key>"
+
+This must be completely removed.
+
+Requirements:
+
+1. REMOVE ALL PRIVATE KEY DISPLAY FROM THE UI
+- Do not show private keys in alert(), modal, toast, tables, input fields, cards, console UI, or any visible frontend component.
+- Search the entire project for:
+  - "Private Key"
+  - "private_key"
+  - alert(
+  - key generation response handling
+- Remove any frontend code that exposes the private key.
+
+2. CHANGE THE REGISTRATION UX
+After successfully registering an entity, show a simple success message such as:
+
+"Agent registered successfully."
+"Credentials are managed securely by the authorization service."
+
+Do NOT include the actual private key.
+
+The registered entities table should continue showing:
+- Type
+- ID
+- Name
+- Public Key
+
+But NEVER show the private key.
+
+3. PRIVATE KEY SECURITY
+Private keys must remain server-side only.
+
+Do not persist private keys in SQLite or any database table.
+
+Do not return private keys in normal API responses consumed by the frontend.
+
+If the backend currently returns private_key in a registration response, refactor the response/schema so the frontend does not receive it.
+
+4. ACTION SIGNING
+The existing action verification flow must continue working.
+
+Do not break the cryptographic signing/verification logic.
+
+If the current architecture requires a private key for signing demo actions, keep that functionality server-side and adapt the demo/action flow so the browser does not need to receive or display the private key.
+
+For development/demo purposes, an in-memory server-side key store is acceptable if necessary, but do NOT write private keys to SQLite.
+
+5. DO NOT CHANGE CORE AUTHORIZATION LOGIC
+Keep the existing:
+- Ed25519 signing
+- signature verification
+- canonicalization
+- delegation validation
+- scope validation
+- revocation cascading
+- spending limits
+- audit hash chain
+- API endpoints
+- test behavior
+
+Only modify the key-handling/exposure architecture and UI where necessary.
+
+6. UI
+Keep the existing enterprise dashboard design exactly as much as possible.
+
+Replace the current browser alert with a non-sensitive success message.
+
+Example:
+
+SUCCESS
+Agent registered successfully.
+Agent ID: agent-975b88bc
+
+No private key should appear anywhere.
+
+7. TEST
+After making changes:
+
+- Run pytest -v
+- Start the server
+- Register an agent through the UI
+- Confirm there is NO private key shown in the browser
+- Confirm the agent is still registered correctly
+- Confirm the action verification flow still works
+- Confirm the audit ledger still works
+
+Also inspect the API response in the frontend code and ensure private_key is not being unnecessarily returned to or rendered by the browser.
+
+IMPORTANT:
+Do not simply hide the private key with CSS or replace it with "••••".
+The private key should NOT be sent to the frontend in the first place.
