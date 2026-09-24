@@ -12,6 +12,7 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 from app.crypto import sign_payload
+from app.services import IN_MEMORY_KEY_STORE
 
 client = TestClient(app)
 
@@ -30,12 +31,13 @@ def main():
     p_resp = client.post("/principals", json={"id": "priya", "name": "Priya Sharma"}).json()
     print(f"[+] Registered Principal: id={p_resp['id']}, name='{p_resp['name']}'")
     print(f"    Public Key:  {p_resp['public_key'][:20]}...")
-    print(f"    Private Key: {p_resp['private_key'][:20]}... (kept client-side only)")
 
     a_resp = client.post("/agents", json={"id": "procurement-intake-agent-v1", "name": "Procurement Intake Agent v1"}).json()
     print(f"[+] Registered Agent:     id={a_resp['id']}, name='{a_resp['name']}'")
     print(f"    Public Key:  {a_resp['public_key'][:20]}...")
-    print(f"    Private Key: {a_resp['private_key'][:20]}... (kept client-side only)")
+
+    p_priv = IN_MEMORY_KEY_STORE[p_resp['id']]
+    a_priv = IN_MEMORY_KEY_STORE[a_resp['id']]
 
     # Step 2: Issue Root Credential
     print_step("Step 2: Issue Root Credential")
@@ -54,8 +56,7 @@ def main():
         "currency": "USD",
         "valid_from": valid_from,
         "valid_until": valid_until,
-        "allow_sub_delegation": True,
-        "issuer_private_key": p_resp["private_key"]
+        "allow_sub_delegation": True
     }
     c_resp = client.post("/credentials", json=cred_req).json()
     print(f"[+] Issued Credential: id={c_resp['id']}")
@@ -78,7 +79,7 @@ def main():
         "details": act1_details,
         "timestamp": act1_timestamp
     }
-    act1_sig = sign_payload(a_resp["private_key"], act1_payload)
+    act1_sig = sign_payload(a_priv, act1_payload)
 
     act1_req = {
         "id": act1_id,
@@ -110,7 +111,7 @@ def main():
         "details": act2_details,
         "timestamp": act2_timestamp
     }
-    act2_sig = sign_payload(a_resp["private_key"], act2_payload)
+    act2_sig = sign_payload(a_priv, act2_payload)
 
     act2_req = {
         "id": act2_id,
@@ -146,7 +147,7 @@ def main():
         "details": act3_details,
         "timestamp": act3_timestamp
     }
-    act3_sig = sign_payload(a_resp["private_key"], act3_payload)
+    act3_sig = sign_payload(a_priv, act3_payload)
 
     act3_req = {
         "id": act3_id,
