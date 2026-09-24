@@ -11,7 +11,6 @@ class PrincipalResponse(BaseModel):
     id: str
     name: str
     public_key: str
-    private_key: str
 
 
 class AgentCreate(BaseModel):
@@ -23,7 +22,6 @@ class AgentResponse(BaseModel):
     id: str
     name: str
     public_key: str
-    private_key: str
 
 
 class CredentialCreate(BaseModel):
@@ -39,7 +37,7 @@ class CredentialCreate(BaseModel):
     valid_from: str
     valid_until: str
     allow_sub_delegation: bool = False
-    issuer_private_key: str
+    issuer_private_key: Optional[str] = None
 
 
 class CredentialResponse(BaseModel):
@@ -71,7 +69,7 @@ class ActionRequestCreate(BaseModel):
     action_type: str
     details: Dict[str, Any]
     timestamp: str
-    agent_signature: str
+    agent_signature: Optional[str] = None
 
 
 class AuditRecordSchema(BaseModel):
