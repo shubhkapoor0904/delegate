@@ -132,6 +132,8 @@
 
     button.btn-danger {
       background-color: var(--danger);
+      font-size: 0.75rem;
+      padding: 4px 8px;
     }
 
     button.btn-danger:hover {
@@ -198,6 +200,16 @@
       border: 1px solid #cbd5e1;
     }
 
+    .notification-box {
+      margin-top: 12px;
+      padding: 10px;
+      border: 1px solid var(--border-color);
+      background: #f0fdf4;
+      color: var(--success);
+      font-size: 0.8125rem;
+      display: none;
+    }
+
     #verdict-display {
       margin-top: 16px;
       padding: 12px;
@@ -233,7 +245,9 @@
         <label for="entity-name">Name</label>
         <input type="text" id="entity-name" placeholder="e.g. Priya Sharma or Procurement-Agent-v1">
       </div>
-      <button onclick="registerEntity()">Register Entity & Generate Keys</button>
+      <button onclick="registerEntity()">Register Entity</button>
+
+      <div id="registration-notice" class="notification-box"></div>
 
       <div style="margin-top: 16px;">
         <label>Registered Principals & Agents</label>
@@ -258,15 +272,11 @@
       <div class="section-title">2. Issue Delegation Credential</div>
       <div class="form-group">
         <label for="cred-issuer">Issuer Principal ID</label>
-        <input type="text" id="cred-issuer" placeholder="principal-id">
-      </div>
-      <div class="form-group">
-        <label for="cred-issuer-key">Issuer Private Key (Hex for Signing)</label>
-        <input type="text" id="cred-issuer-key" placeholder="private key hex">
+        <input type="text" id="cred-issuer" placeholder="principal-id (or select from list)">
       </div>
       <div class="form-group">
         <label for="cred-subject">Subject Agent ID</label>
-        <input type="text" id="cred-subject" placeholder="agent-id">
+        <input type="text" id="cred-subject" placeholder="agent-id (or select from list)">
       </div>
       <div class="form-group">
         <label for="cred-parent">Parent Credential ID (Optional Sub-delegation)</label>
@@ -321,10 +331,6 @@
         <input type="text" id="act-agent-id" placeholder="agent-id">
       </div>
       <div class="form-group">
-        <label for="act-agent-key">Agent Private Key (For Signature)</label>
-        <input type="text" id="act-agent-key" placeholder="agent private key hex">
-      </div>
-      <div class="form-group">
         <label for="act-cred-id">Credential ID</label>
         <input type="text" id="act-cred-id" placeholder="cred-id">
       </div>
@@ -370,13 +376,19 @@
   </div>
 
   <script>
-    const API_BASE = "";
-    let localKeys = {};
-
     async function registerEntity() {
       const type = document.getElementById("entity-type").value;
       const name = document.getElementById("entity-name").value;
-      if (!name) return alert("Please enter entity name");
+      const notice = document.getElementById("registration-notice");
+
+      if (!name) {
+        notice.style.display = "block";
+        notice.style.background = "#fef2f2";
+        notice.style.color = "var(--danger)";
+        notice.style.borderColor = "#fecaca";
+        notice.innerHTML = "<strong>ERROR</strong><br>Please enter entity name.";
+        return;
+      }
 
       const endpoint = type === "principal" ? "/principals" : "/agents";
       const resp = await fetch(endpoint, {
@@ -385,27 +397,64 @@
         body: JSON.stringify({ name })
       });
 
-      if (!resp.ok) return alert("Registration failed");
-      const data = await resp.json();
-      localKeys[data.id] = data.private_key;
+      const resData = await resp.json();
+      if (!resp.ok) {
+        notice.style.display = "block";
+        notice.style.background = "#fef2f2";
+        notice.style.color = "var(--danger)";
+        notice.style.borderColor = "#fecaca";
+        notice.innerHTML = `<strong>ERROR</strong><br>Registration failed: ${resData.detail || "Error"}`;
+        return;
+      }
 
-      alert(`Registered ${type.toUpperCase()}: ${data.id}\nPrivate Key (Save this): ${data.private_key}`);
+      const entityTitle = type === 'principal' ? 'Principal' : 'Agent';
+      notice.style.display = "block";
+      notice.style.background = "#f0fdf4";
+      notice.style.color = "var(--success)";
+      notice.style.borderColor = "var(--border-color)";
+      notice.innerHTML = `<strong>SUCCESS</strong><br>${entityTitle} registered successfully.<br>${entityTitle} ID: ${resData.id}<br><span style="font-size:0.75rem; color: var(--text-muted);">Credentials are managed securely by the authorization service.</span>`;
+
+      document.getElementById("entity-name").value = "";
       loadEntities();
     }
 
     async function loadEntities() {
-      // Refresh local lists from credentials/audit
-      loadCredentials();
-      loadAudit();
+      const [pRes, aRes] = await Promise.all([
+        fetch("/principals").then(r => r.ok ? r.json() : []),
+        fetch("/agents").then(r => r.ok ? r.json() : [])
+      ]);
+
+      const tbody = document.getElementById("entities-list");
+      const allEntities = [
+        ...pRes.map(p => ({ type: "Principal", id: p.id, name: p.name, pub_key: p.public_key })),
+        ...aRes.map(a => ({ type: "Agent", id: a.id, name: a.name, pub_key: a.public_key }))
+      ];
+
+      if (allEntities.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color: var(--text-muted);">No entities registered yet</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = allEntities.map(e => `
+        <tr>
+          <td><strong>${e.type}</strong></td>
+          <td class="code-text">${e.id}</td>
+          <td>${e.name}</td>
+          <td class="code-text">${e.pub_key.substring(0, 16)}...</td>
+        </tr>
+      `).join("");
     }
 
     async function issueCredential() {
       const issuer_principal_id = document.getElementById("cred-issuer").value;
-      const issuer_private_key = document.getElementById("cred-issuer-key").value;
       const subject_agent_id = document.getElementById("cred-subject").value;
       const parent_credential_id = document.getElementById("cred-parent").value || null;
       const max_amount_per_action = parseFloat(document.getElementById("cred-max-action").value);
       const max_amount_cumulative = parseFloat(document.getElementById("cred-max-cum").value);
+
+      if (!issuer_principal_id || !subject_agent_id) {
+        return alert("Please enter Issuer Principal ID and Subject Agent ID");
+      }
 
       const now = new Date();
       const valid_from = new Date(now.getTime() - 60000).toISOString();
@@ -422,8 +471,7 @@
         currency: "USD",
         valid_from,
         valid_until,
-        allow_sub_delegation: true,
-        issuer_private_key
+        allow_sub_delegation: true
       };
 
       const resp = await fetch("/credentials", {
@@ -450,27 +498,69 @@
     }
 
     async function loadCredentials() {
-      // Read credentials from active audit / actions list or mock view
-      // We will render table when actions or credentials created
+      const resp = await fetch("/credentials");
+      if (!resp.ok) return;
+      const creds = await resp.json();
+
+      const tbody = document.getElementById("credentials-list");
+      if (creds.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; color: var(--text-muted);">No credentials issued yet</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = creds.map(c => `
+        <tr>
+          <td class="code-text">${c.id}</td>
+          <td>Issuer: ${c.issuer_principal_id}<br>Subject: ${c.subject_agent_id}</td>
+          <td class="code-text">${c.parent_credential_id || "-"}</td>
+          <td>$${c.max_amount_per_action.toFixed(2)}</td>
+          <td>$${c.spent_so_far.toFixed(2)} / $${c.max_amount_cumulative.toFixed(2)}</td>
+          <td><span class="badge badge-${c.status}">${c.status}</span></td>
+          <td>
+            ${c.status === 'active' ? `<button class="btn-danger" onclick="revokeCredential('${c.id}')">Revoke</button>` : '-'}
+          </td>
+        </tr>
+      `).join("");
     }
 
     async function submitAction() {
-      const id = document.getElementById("act-id").value || ("action-" + Math.floor(Math.random()*10000));
+      const id = document.getElementById("act-id").value || ("act-" + Math.floor(Math.random()*10000));
       const agent_id = document.getElementById("act-agent-id").value;
-      const agent_priv_key = document.getElementById("act-agent-key").value;
       const credential_id = document.getElementById("act-cred-id").value;
       const action_type = document.getElementById("act-type").value;
       const amount = parseFloat(document.getElementById("act-amount").value);
       const timestamp = new Date().toISOString();
 
-      if (!agent_priv_key) return alert("Please enter agent private key for client signing");
+      if (!agent_id || !credential_id) {
+        return alert("Please enter Agent ID and Credential ID");
+      }
 
       const details = { category: "software", amount, vendor: "Enterprise Vendor" };
 
-      // Canonical payload simulation for signing in browser demo
-      // For demo JS UI, we send signature directly by calling backend signing endpoint or local sign
-      // We can generate hex signature using backend helper or simple fetch to create test request
-      alert("Submitting action request...");
+      const resp = await fetch("/actions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id,
+          agent_id,
+          credential_id,
+          action_type,
+          details,
+          timestamp
+        })
+      });
+
+      const data = await resp.json();
+      const display = document.getElementById("verdict-display");
+      const statusSpan = document.getElementById("verdict-status");
+      const reasonsDiv = document.getElementById("verdict-reasons");
+
+      display.style.display = "block";
+      statusSpan.innerHTML = `<span class="badge badge-${data.verdict}">${data.verdict.toUpperCase()}</span>`;
+      reasonsDiv.innerHTML = data.reasons.length > 0 ? "Reasons: " + data.reasons.join(", ") : "";
+
+      loadCredentials();
+      loadAudit();
     }
 
     async function loadAudit() {
@@ -502,6 +592,8 @@
     }
 
     // Initial load
+    loadEntities();
+    loadCredentials();
     loadAudit();
   </script>
 </body>
