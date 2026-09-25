@@ -1,3 +1,6 @@
 delegate.db
 __pycache__/
 *.pyc
+prompt.txt
+walkthrough.md
+implementation_plan.md
